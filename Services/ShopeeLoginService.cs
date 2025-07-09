@@ -7,7 +7,15 @@ namespace EcommerceApiScrapingService.Services
         public async Task<Dictionary<string, string>> LoginAndGetHeaders(string username, string password)
         {
             using var playwright = await Playwright.CreateAsync();
-            var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+            var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true,
+                Args = new[]
+                {
+                    "--no-sandbox",                // Bỏ sandbox (chạy trên root)
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",     // Tránh chia sẻ bộ nhớ /dev/shm bị đầy
+                    "--disable-gpu"                // Tắt GPU nếu container không hỗ trợ
+                }
+            });
             var context = await browser.NewContextAsync();
             var page = await context.NewPageAsync();
 
@@ -43,14 +51,14 @@ namespace EcommerceApiScrapingService.Services
             await browser.CloseAsync();
 
             return new Dictionary<string, string>
-        {
-            { "User-Agent", userAgent },
-            { "Cookie", cookieHeader },
-            { "x-csrftoken", csrftoken },
-            { "x-requested-with", "XMLHttpRequest" },
-            { "SPC_CDS", spcCds },
-            { "SPC_CDS_VER", spcCdsVer }
-        };
+            {
+                { "User-Agent", userAgent },
+                { "Cookie", cookieHeader },
+                { "x-csrftoken", csrftoken },
+                { "x-requested-with", "XMLHttpRequest" },
+                { "SPC_CDS", spcCds },
+                { "SPC_CDS_VER", spcCdsVer }
+            };
         }
     }
 }

@@ -4,7 +4,10 @@ using EcommerceApiScrapingService.Models;
 using EcommerceApiScrapingService.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace EcommerceApiScrapingService.Controllers
 {
@@ -16,6 +19,7 @@ namespace EcommerceApiScrapingService.Controllers
         private readonly AccountTokenService _accountTokenService;
         private readonly ShopeeOAuthSettings _oAuthSettings;
         private readonly ShopeeLoginService _loginService;
+
 
         public AccountController(AccountService service, IOptions<ShopeeOAuthSettings> oAuthSettings, ShopeeLoginService loginService, AccountTokenService accountTokenService)
         {
@@ -178,44 +182,299 @@ namespace EcommerceApiScrapingService.Controllers
         }
 
 
+        //[HttpGet("product-detail")]
+        //public async Task<IActionResult> GetProductDetail([FromQuery] string productId)
+        //{
+        //    // Lấy headers từ DB (tuỳ bạn lưu theo shopId/user...)
+
+        //    string username = "0938641861";
+
+        //    var token = _accountTokenService.GetByUsername(username);
+        //    if (token == null)
+        //        return NotFound(new { message = "Không tìm thấy token cho tài khoản này!" });
+
+        //    // Build URL (SPC_CDS... lấy từ headers/token hoặc truyền qua param)
+        //    var spcCds = token.SPC_CDS;
+        //    var spcCdsVer = token.SPC_CDS_VER ?? "2";
+        //    var url = $"https://banhang.shopee.vn/api/v3/product/get_product_info?SPC_CDS={spcCds}&SPC_CDS_VER={spcCdsVer}&product_id={productId}&is_draft=false";
+
+        //    using var httpClient = new HttpClient();
+
+        //    // Add đủ các header như browser
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json, text/plain, */*");
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5");
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", token.Cookie);
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("sec-fetch-dest", "empty");
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("sec-fetch-mode", "cors");
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("sec-fetch-site", "same-origin");
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", token.UserAgent);
+
+        //    var response = await httpClient.GetAsync(url);
+
+        //    // Lấy Content-Type trả về từ Shopee (browser cũng như này)
+        //    var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
+
+        //    // Đọc đúng response dạng string
+        //    var content = await response.Content.ReadAsStringAsync();
+
+        //    using var doc = JsonDocument.Parse(content);
+
+        //    // Lấy node product_info
+        //    var prodEl = doc.RootElement
+        //        .GetProperty("data");
+
+        //    var result = Content(prodEl.GetRawText(), "application/json");
+
+
+        //    return result;
+
+
+        //}
+
+
+
+        //[HttpPost("product-detail")]
+        //public async Task<IActionResult> GetProductDetail([FromQuery] string productId)
+        //{
+        //    // 1) Lấy token & build URL GET
+        //    string username = "0938641861";
+        //    var token = _accountTokenService.GetByUsername(username);
+        //    if (token == null)
+        //        return NotFound(new { message = "Không tìm thấy token!" });
+
+        //    var spcCds = token.SPC_CDS;
+        //    var spcCdsVer = token.SPC_CDS_VER ?? "2";
+        //    var getUrl =
+        //      $"https://banhang.shopee.vn/api/v3/product/get_product_info" +
+        //      $"?SPC_CDS={spcCds}&SPC_CDS_VER={spcCdsVer}" +
+        //      $"&product_id={productId}&is_draft=false";
+
+        //    using var httpClient = new HttpClient();
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "*/*");
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", token.UserAgent);
+        //    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", token.Cookie);
+        //    // … thêm các header khác nếu cần
+
+        //    var getResp = await httpClient.GetAsync(getUrl);
+        //    if (!getResp.IsSuccessStatusCode)
+        //        return StatusCode((int)getResp.StatusCode,
+        //                          await getResp.Content.ReadAsStringAsync());
+
+        //    var rawJson = await getResp.Content.ReadAsStringAsync();
+
+        //    // 2) Parse & clone JsonNode
+        //    var rootNode = JsonNode.Parse(rawJson)!;
+        //    var prodInfoNode = rootNode["data"]!["product_info"]!;
+        //    var prodInfoClone = JsonNode.Parse(prodInfoNode.ToJsonString())!;
+
+        //    // 3) Mutate fields
+        //    prodInfoClone["id"] = null;  // để hệ thống cấp lại hoặc bỏ id cũ
+        //    prodInfoClone["create_time"] = JsonValue.Create(
+        //        DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        //    );
+
+        //    // 4) Remove complaint_policy hoàn toàn
+        //    prodInfoClone.AsObject().Remove("complaint_policy");
+
+        //    // 5) Build payload wrapper và POST
+        //    var createPayload = new JsonObject
+        //    {
+        //        ["is_draft"] = false,
+        //        ["product_info"] = prodInfoClone
+        //    };
+
+        //    var postJson = createPayload.ToJsonString();
+        //    using var content = new StringContent(
+        //        postJson,
+        //        Encoding.UTF8,
+        //        "application/json"
+        //    );
+
+        //    var createUrl =
+        //      $"https://banhang.shopee.vn/api/v3/product/create_product_info" +
+        //      $"?SPC_CDS={spcCds}&SPC_CDS_VER={spcCdsVer}";
+        //    var postResp = await httpClient.PostAsync(createUrl, content);
+
+        //    var respStr = await postResp.Content.ReadAsStringAsync();
+        //    if (!postResp.IsSuccessStatusCode)
+        //        return StatusCode((int)postResp.StatusCode, respStr);
+
+        //    // 6) Trả về kết quả của POST
+        //    return Content(respStr, "application/json");
+        //}
+
+
+
         [HttpGet("product-detail")]
         public async Task<IActionResult> GetProductDetail([FromQuery] string productId)
         {
-            // Lấy headers từ DB (tuỳ bạn lưu theo shopId/user...)
-
             string username = "0938641861";
-
             var token = _accountTokenService.GetByUsername(username);
             if (token == null)
-                return NotFound(new { message = "Không tìm thấy token cho tài khoản này!" });
+                return NotFound(new { message = "Không tìm thấy token!" });
 
-            // Build URL (SPC_CDS... lấy từ headers/token hoặc truyền qua param)
+            // 1) Lấy JSON detail
             var spcCds = token.SPC_CDS;
             var spcCdsVer = token.SPC_CDS_VER ?? "2";
-            var url = $"https://banhang.shopee.vn/api/v3/product/get_product_info?SPC_CDS={spcCds}&SPC_CDS_VER={spcCdsVer}&product_id={productId}&is_draft=false";
+            var getUrl = $"https://banhang.shopee.vn/api/v3/product/get_product_info" +
+                         $"?SPC_CDS={spcCds}&SPC_CDS_VER={spcCdsVer}" +
+                         $"&product_id={productId}&is_draft=false";
 
             using var httpClient = new HttpClient();
-
-            // Add đủ các header như browser
-            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json, text/plain, */*");
-            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5");
-            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", token.Cookie);
-            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("sec-fetch-dest", "empty");
-            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("sec-fetch-mode", "cors");
-            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("sec-fetch-site", "same-origin");
             httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", token.UserAgent);
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", token.Cookie);
+            var getResp = await httpClient.GetAsync(getUrl);
+            if (!getResp.IsSuccessStatusCode)
+                return StatusCode((int)getResp.StatusCode, await getResp.Content.ReadAsStringAsync());
 
-            var response = await httpClient.GetAsync(url);
+            var rawJson = await getResp.Content.ReadAsStringAsync();
+            var root = JsonNode.Parse(rawJson)!;
+            var detail = root["data"]!["product_info"]!;
 
-            // Lấy Content-Type trả về từ Shopee (browser cũng như này)
-            var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
+            // 2) Map sang payload cho create
+            JsonObject payload = MapDetailToCreatePayload(detail);
 
-            // Đọc đúng response dạng string
-            var content = await response.Content.ReadAsStringAsync();
+            // 3) Gửi request create
+            var createUrl = $"https://banhang.shopee.vn/api/v3/product/create_product_info" +
+                            $"?SPC_CDS={spcCds}&SPC_CDS_VER={spcCdsVer}";
+            using var content = new StringContent(
+                new JsonObject
+                {
+                    ["product_info"] = payload,
+                    ["is_draft"] = false
+                }.ToJsonString(),
+                Encoding.UTF8,
+                "application/json"
+            );
+            var postResp = await httpClient.PostAsync(createUrl, content);
+            var respStr = await postResp.Content.ReadAsStringAsync();
+            if (!postResp.IsSuccessStatusCode)
+                return StatusCode((int)postResp.StatusCode, respStr);
 
-            // Trả ra đúng content-type cho Postman/browser đọc
-            return Content(content, contentType);
+            return Content(respStr, "application/json");
         }
+
+
+
+
+        private JsonObject MapDetailToCreatePayload(JsonNode detail)
+        {
+            var dest = new JsonObject();
+
+            // 1) Các trường cơ bản
+            if (detail["name"] is JsonNode name)
+                dest["name"] = name.DeepClone();
+            if (detail["enable_model_level_dts"] is JsonNode dts)
+                dest["enable_model_level_dts"] = dts.DeepClone();
+            if (detail["category_path"] is JsonArray cp)
+                dest["category_path"] = cp.DeepClone();
+            if (detail["weight"] is JsonObject wgt)
+                dest["weight"] = wgt.DeepClone();
+            if (detail["condition"] is JsonNode cond)
+                dest["condition"] = cond.DeepClone();
+            if (detail["parent_sku"] is JsonNode ps)
+                dest["parent_sku"] = ps.DeepClone();
+
+            // brand_id nằm trong brand_info
+            if (detail["brand_info"] is JsonObject bi && bi["brand_id"] is JsonNode bid)
+                dest["brand_id"] = bid.DeepClone();
+
+            // 2) Attributes, images, long_images
+            if (detail["attributes"] is JsonArray attrs)
+                dest["attributes"] = attrs.DeepClone();
+            if (detail["images"] is JsonArray imgs)
+                dest["images"] = imgs.DeepClone();
+            if (detail["long_images"] is JsonArray limgs)
+                dest["long_images"] = limgs.DeepClone();
+
+            // 3) Tier variations
+            if (detail["std_tier_variation_list"] is JsonArray stdTier)
+                dest["std_tier_variation_list"] = stdTier.DeepClone();
+
+            // 4) Các trường thông tin khác
+            if (detail["size_chart_info"] is JsonObject sci)
+                dest["size_chart_info"] = sci.DeepClone();
+            if (detail["video_list"] is JsonArray vl)
+                dest["video_list"] = vl.DeepClone();
+            if (detail["description_info"] is JsonObject di)
+                dest["description_info"] = di.DeepClone();
+            if (detail["dimension"] is JsonObject dim)
+                dest["dimension"] = dim.DeepClone();
+            if (detail["pre_order_info"] is JsonObject poi)
+                dest["pre_order_info"] = poi.DeepClone();
+            if (detail["wholesale_list"] is JsonArray wl)
+                dest["wholesale_list"] = wl.DeepClone();
+
+            // unlisted (hoặc is_unlisted tuỳ field)
+            if (detail["is_unlisted"] is JsonNode un)
+                dest["unlisted"] = un.DeepClone();
+
+            // 5) Logistics channels: phải có ít nhất một channel.enabled = true
+            JsonArray logisticsClone;
+            if (detail["logistics_channels"] is JsonArray chans && chans.Count > 0)
+            {
+                logisticsClone = chans.DeepClone()!.AsArray();
+                // bật channel đầu tiên nếu chưa có channel nào enabled
+                if (!logisticsClone.OfType<JsonObject>().Any(c => c["enabled"]?.GetValue<bool>() == true))
+                    logisticsClone.OfType<JsonObject>().First()["enabled"] = true;
+            }
+            else
+            {
+                // fallback: thêm một channel mặc định (ví dụ 5002)
+                logisticsClone = new JsonArray {
+            new JsonObject {
+                ["size"] = 0,
+                ["price"] = "0",
+                ["cover_shipping_fee"] = false,
+                ["enabled"] = true,
+                ["channelid"] = 5002,
+                ["sizeid"] = 0
+            }
+        };
+            }
+            dest["logistics_channels"] = logisticsClone;
+
+            // 6) Build model_list theo đúng format payload mẫu
+            var newModels = new JsonArray();
+            if (detail["model_list"] is JsonArray modelList)
+            {
+                foreach (var item in modelList.OfType<JsonObject>())
+                {
+                    var nm = new JsonObject
+                    {
+                        ["id"] = 0
+                    };
+
+                    if (item["tier_index"] is JsonArray ti)
+                        nm["tier_index"] = ti.DeepClone();
+                    if (item["is_default"] is JsonNode df)
+                        nm["is_default"] = df.DeepClone();
+                    if (item["sku"] is JsonNode sku)
+                        nm["sku"] = sku.DeepClone();
+
+                    // price: lấy input_normal_price
+                    if (item["price_info"] is JsonObject pi && pi["input_normal_price"] is JsonNode inp)
+                        nm["price"] = inp.DeepClone();
+
+                    // stock_setting_list: chỉ lấy sellable_stock
+                    if (item["stock_detail"] is JsonObject sd &&
+                        sd["seller_stock_info"] is JsonArray ssi &&
+                        ssi.FirstOrDefault() is JsonObject firstSeller &&
+                        firstSeller["sellable_stock"] is JsonNode ss)
+                    {
+                        nm["stock_setting_list"] = new JsonArray {
+                    new JsonObject { ["sellable_stock"] = ss.DeepClone() }
+                };
+                    }
+
+                    newModels.Add(nm);
+                }
+            }
+            dest["model_list"] = newModels;
+
+            return dest;
+        }
+
 
     }
 }
@@ -223,4 +482,43 @@ public class ShopeeLoginRequest
 {
     public string Username { get; set; }
     public string Password { get; set; }
+}
+
+public class ShopeeResponse<T>
+{
+    [JsonPropertyName("code")]
+    public int Code { get; set; }
+
+    [JsonPropertyName("msg")]
+    public string Msg { get; set; }
+
+    [JsonPropertyName("user_message")]
+    public string UserMessage { get; set; }
+
+    [JsonPropertyName("data")]
+    public T Data { get; set; }
+}
+
+public class DataContainer
+{
+    [JsonPropertyName("product_info")]
+    public ProductInfo ProductInfo { get; set; }
+
+    [JsonPropertyName("long_images")]
+    public List<string> LongImages { get; set; }
+}
+
+public class ProductInfo
+{
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
+
+    [JsonPropertyName("status")]
+    public int Status { get; set; }
+
+    [JsonPropertyName("images")]
+    public List<string> Images { get; set; }
 }
