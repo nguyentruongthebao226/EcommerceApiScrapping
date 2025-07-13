@@ -29,7 +29,7 @@ namespace EcommerceApiScrapingService.Controllers
         {
             try
             {
-                var headers = await _authSvc.LoginAndSaveAsync(req.Username, req.Password);
+                var headers = await _authSvc.LoginAndSaveAsync(req.Username, req.Password, req.IsHost);
                 return Ok(new ApiResponse<Dictionary<string, string>>(200, "Login success", headers));
             }
             catch (Exception ex)
@@ -71,7 +71,39 @@ namespace EcommerceApiScrapingService.Controllers
         }
 
         [HttpGet("product-detail")]
-        public async Task<IActionResult> CloneProduct(
+        public async Task<IActionResult> GetProductDetail(
+           [FromQuery] string username,
+           [FromQuery] string productId)
+        {
+            try
+            {
+                var detail = await _prodSvc.GetProductDetailAsync(username, productId);
+                return Ok(detail);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        [HttpPost("product-create")]
+        public async Task<IActionResult> CreateProduct(
+           [FromQuery] string username,
+           [FromBody] JsonObject payload)
+        {
+            try
+            {
+                var result = await _prodSvc.CreateProductAsync(username, payload);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        [HttpPost("product-detail-clone")]
+        public async Task<IActionResult> CloneProductByDetail(
             [FromQuery] string username,
             [FromQuery] string productId)
         {

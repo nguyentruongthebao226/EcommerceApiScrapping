@@ -52,7 +52,8 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services
        .AddScoped(typeof(IRepository<>), typeof(MongoRepository<>))
-       .AddScoped<IAccountTokenRepository, AccountTokenRepository>();
+       .AddScoped<IAccountTokenRepository, AccountTokenRepository>()
+       .AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.Configure<ShopeeOAuthSettings>(
     builder.Configuration.GetSection("ShopeeOAuth"));
 builder.Services.AddControllers();

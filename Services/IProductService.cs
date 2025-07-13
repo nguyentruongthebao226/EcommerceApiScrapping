@@ -7,6 +7,8 @@ namespace EcommerceApiScrapingService.Services
     {
         Task<JsonNode> GetShopInfoAsync(string username);
         Task<JsonNode> GetProductListAsync(string username, int pageNumber, int pageSize);
+        Task<JsonNode> GetProductDetailAsync(string username, string productId);
+        Task<JsonNode> CreateProductAsync(string username, JsonObject payload);
         Task<JsonNode> CloneProductAsync(string username, string productId);
     }
 
@@ -46,6 +48,21 @@ namespace EcommerceApiScrapingService.Services
             _logger.LogInformation("Lấy product-list trang {Page}", pageNumber);
             var node = await _shopee.GetProductListAsync(token, pageNumber, pageSize);
             return node;
+        }
+
+        public async Task<JsonNode> GetProductDetailAsync(string username, string productId)
+        {
+            var token = await _accountTokenRepo.GetByUsername(username);
+            if (token == null) throw new ArgumentException($"Không tìm thấy token cho user '{username}'");
+            return await _shopee.GetProductDetailAsync(token, productId);
+        }
+
+        public async Task<JsonNode> CreateProductAsync(string username, JsonObject payload)
+        {
+            var token = await _accountTokenRepo.GetByUsername(username);
+            if (token == null) throw new ArgumentException($"Không tìm thấy token cho user '{username}'");
+            var payloadMapping = MapDetailToCreatePayload(payload);
+            return await _shopee.CreateProductAsync(token, payloadMapping);
         }
 
         public async Task<JsonNode> CloneProductAsync(string username, string productId)

@@ -1,9 +1,10 @@
-﻿using MongoDB.Bson;
+﻿using EcommerceApiScrapingService.Repositories;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace EcommerceApiScrapingService.Models
 {
-    public class Account
+    public class Account : IEntity
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
@@ -23,7 +24,6 @@ namespace EcommerceApiScrapingService.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? LastLoginAt { get; set; }   // Lần cuối đăng nhập
         public string Country { get; set; }          // Quốc gia (Shopee VN, ID, SG, PH...)
-
         // Nếu dùng thêm đa nền tảng (Amazon, Yahoo...) có thể bổ sung PlatformType
         public string Platform { get; set; } = "Shopee"; // Shopee, Amazon, Yahoo, v.v.
     }
