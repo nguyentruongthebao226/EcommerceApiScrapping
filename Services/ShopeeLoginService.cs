@@ -4,20 +4,15 @@ namespace EcommerceApiScrapingService.Services
 {
     public class ShopeeLoginService
     {
+        private readonly IBrowser _browser;
+        public ShopeeLoginService(IBrowser browser) => _browser = browser;
+
         public async Task<Dictionary<string, string>> LoginAndGetHeaders(string username, string password)
         {
-            using var playwright = await Playwright.CreateAsync();
-            var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true,
-                Args = new[]
-                {
-                    "--no-sandbox",                // Bỏ sandbox (chạy trên root)
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",     // Tránh chia sẻ bộ nhớ /dev/shm bị đầy
-                    "--disable-gpu"                // Tắt GPU nếu container không hỗ trợ
-                }
-            });
-            var context = await browser.NewContextAsync();
+            await using var context = await _browser.NewContextAsync();
             var page = await context.NewPageAsync();
+            //var context = await browser.NewContextAsync();
+            //var page = await context.NewPageAsync();
 
             // Truy cập trang login Seller
             await page.GotoAsync("https://accounts.shopee.vn/seller/login");
@@ -38,19 +33,12 @@ namespace EcommerceApiScrapingService.Services
             // Lấy cookies sau khi đã login và load xong!
             var cookies = await context.CookiesAsync();
             var cookieHeader = string.Join("; ", cookies.Select(c => $"{c.Name}={c.Value}"));
-
             var csrftoken = cookies.FirstOrDefault(c => c.Name == "csrftoken")?.Value ?? "";
-
             var userAgent = await page.EvaluateAsync<string>("() => navigator.userAgent");
-
             var spcCds = cookies.FirstOrDefault(c => c.Name == "SPC_CDS")?.Value ?? "";
             var spcCdsVer = cookies.FirstOrDefault(c => c.Name == "SPC_CDS_VER")?.Value ?? "";
 
-            // Không đóng browser/context ở đây nếu bạn muốn tiếp tục thao tác
-            // Nếu chắc chắn đã lấy đủ thì mới đóng
-            await browser.CloseAsync();
-
-            return new Dictionary<string, string>
+            var defaultHeaders = new Dictionary<string, string>
             {
                 { "User-Agent", userAgent },
                 { "Cookie", cookieHeader },
@@ -59,6 +47,20 @@ namespace EcommerceApiScrapingService.Services
                 { "SPC_CDS", spcCds },
                 { "SPC_CDS_VER", spcCdsVer }
             };
+
+            // Merge từng cookie riêng lẻ
+            foreach (var c in cookies)
+            {
+                // key = cookie name, value = cookie value
+                // ví dụ headers["SPC_CDS"] = "...";
+                defaultHeaders[c.Name] = c.Value;
+            }
+
+            // Không đóng browser/context ở đây nếu bạn muốn tiếp tục thao tác
+            // Nếu chắc chắn đã lấy đủ thì mới đóng
+            await context.CloseAsync();
+
+            return defaultHeaders;
         }
     }
 }
