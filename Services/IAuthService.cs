@@ -10,6 +10,7 @@ namespace EcommerceApiScrapingService.Services
         /// Đăng nhập Shopee qua Playwright, lưu token vào DB rồi trả về các header cần thiết.
         /// </summary>
         Task<Dictionary<string, string>> LoginAndSaveAsync(string username, string password, bool isHost);
+        Task<List<Account>> ShopInfosAsync();
     }
 
     public class AuthService : IAuthService
@@ -83,6 +84,14 @@ namespace EcommerceApiScrapingService.Services
 
 
             return headers;
+        }
+
+        public async Task<List<Account>> ShopInfosAsync()
+        {
+            var allShop = await _accountRepo.GetAllAsync();
+            if (allShop != null)
+                return allShop;
+            return new List<Account>();
         }
     }
 }

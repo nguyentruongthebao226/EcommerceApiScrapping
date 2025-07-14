@@ -61,8 +61,12 @@ namespace EcommerceApiScrapingService.Services
         {
             var token = await _accountTokenRepo.GetByUsername(username);
             if (token == null) throw new ArgumentException($"Không tìm thấy token cho user '{username}'");
+            string productId = "";
+            if (payload["id"] is JsonNode id)
+                productId = id.DeepClone().ToString();
+
             var payloadMapping = MapDetailToCreatePayload(payload);
-            return await _shopee.CreateProductAsync(token, payloadMapping);
+            return await _shopee.CreateProductAsync(token, payloadMapping, productId);
         }
 
         public async Task<JsonNode> CloneProductAsync(string username, string productId)
@@ -80,7 +84,7 @@ namespace EcommerceApiScrapingService.Services
             var payload = MapDetailToCreatePayload(detail);
 
             // 3) Gửi create
-            var result = await _shopee.CreateProductAsync(token, payload);
+            var result = await _shopee.CreateProductAsync(token, payload, productId);
 
             return result;
         }

@@ -1,19 +1,12 @@
-﻿using EcommerceApiScrapingService.Configurations;
-using EcommerceApiScrapingService.DTOs;
-using EcommerceApiScrapingService.Models;
-using EcommerceApiScrapingService.Services;
+﻿using EcommerceApiScrapingService.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 
 namespace EcommerceApiScrapingService.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class ShopeeController : ControllerBase
+    public partial class ShopeeController : ControllerBase
     {
         private readonly IProductService _prodSvc;
         private readonly IAuthService _authSvc;
@@ -22,21 +15,6 @@ namespace EcommerceApiScrapingService.Controllers
         {
             _prodSvc = prodSvc;
             _authSvc = authSvc;
-        }
-
-        [HttpPost("login")]
-        public async Task<IActionResult> ShopeeLogin([FromBody] ShopeeLoginRequest req)
-        {
-            try
-            {
-                var headers = await _authSvc.LoginAndSaveAsync(req.Username, req.Password, req.IsHost);
-                return Ok(new ApiResponse<Dictionary<string, string>>(200, "Login success", headers));
-            }
-            catch (Exception ex)
-            {
-                // Có thể phân biệt lỗi do Playwright, do DB, v.v.
-                return StatusCode(500, new ApiResponse<object>(500, $"Login failed: {ex.Message}", null));
-            }
         }
 
         [HttpGet("shop-info")]
@@ -117,6 +95,13 @@ namespace EcommerceApiScrapingService.Controllers
                 return NotFound(ex.Message);
             }
         }
+
+
+        // API get list product chưa clone (filter theo pagination, theo danh mục, theo tất cả)
+        // API Clone theo danh mục, tất cả, picked (kiểm tra record đã cloned)
+        // API UpdateAndClone khi vào trang detail và chỉnh sửa
+
+
     }
 }
 

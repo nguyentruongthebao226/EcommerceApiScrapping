@@ -5,7 +5,6 @@ using EcommerceApiScrapingService.Services;
 using Microsoft.Extensions.Options;
 using Microsoft.Playwright;
 using Polly;
-using Polly.Extensions.Http;
 using System.Net.Http.Headers;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,7 +52,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services
        .AddScoped(typeof(IRepository<>), typeof(MongoRepository<>))
        .AddScoped<IAccountTokenRepository, AccountTokenRepository>()
-       .AddScoped<IAccountRepository, AccountRepository>();
+       .AddScoped<IAccountRepository, AccountRepository>()
+       .AddScoped<IProductClonedRepository, ProductClonedRepository>();
+
 builder.Services.Configure<ShopeeOAuthSettings>(
     builder.Configuration.GetSection("ShopeeOAuth"));
 builder.Services.AddControllers();

@@ -1,7 +1,7 @@
 ﻿using EcommerceApiScrapingService.DTOs;
 using EcommerceApiScrapingService.Models;
+using EcommerceApiScrapingService.Repositories;
 using Microsoft.Extensions.Options;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json.Nodes;
 
@@ -12,17 +12,19 @@ namespace EcommerceApiScrapingService.Services
         Task<JsonNode> GetShopInfoAsync(AccountToken token);
         Task<JsonNode> GetProductListAsync(AccountToken token, int page, int size);
         Task<JsonNode> GetProductDetailAsync(AccountToken token, string productId);
-        Task<JsonNode> CreateProductAsync(AccountToken token, JsonObject payload);
+        Task<JsonNode> CreateProductAsync(AccountToken token, JsonObject payload, string productId);
     }
 
     public class ShopeeClient : IShopeeClient
     {
         private readonly HttpClient _http;
         private readonly ShopeeApiOptions _opt;
-        public ShopeeClient(HttpClient http, IOptions<ShopeeApiOptions> opt)
+        private readonly IProductClonedRepository _productClonedRepository;
+        public ShopeeClient(HttpClient http, IOptions<ShopeeApiOptions> opt, IProductClonedRepository productClonedRepository)
         {
             _http = http;
             _opt = opt.Value;
+            _productClonedRepository = productClonedRepository;
         }
 
         private HttpRequestMessage NewRequest(HttpMethod method, string path, AccountToken tkn)
@@ -96,7 +98,7 @@ namespace EcommerceApiScrapingService.Services
             return root["data"]!["product_info"]!;
         }
 
-        public async Task<JsonNode> CreateProductAsync(AccountToken token, JsonObject payload)
+        public async Task<JsonNode> CreateProductAsync(AccountToken token, JsonObject payload, string productId)
         {
             var req = NewRequest(HttpMethod.Post, _opt.Endpoints.CreateProduct, token);
             var wrapper = new JsonObject
@@ -118,10 +120,15 @@ namespace EcommerceApiScrapingService.Services
             Console.WriteLine($"[CreateProduct] Body: {body}");
 
             if (!resp.IsSuccessStatusCode)
+            {
                 throw new InvalidOperationException(
                     $"CreateProduct failed {(int)resp.StatusCode}: {body}"
                 );
-
+            }
+            else
+            {
+                await _productClonedRepository.CreateProductCloned(token, productId);
+            }
             return JsonNode.Parse(body)!;
         }
     }
