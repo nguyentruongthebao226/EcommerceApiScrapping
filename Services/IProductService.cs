@@ -69,22 +69,45 @@ namespace EcommerceApiScrapingService.Services
             return await _shopee.CreateProductAsync(token, payloadMapping, productId);
         }
 
+        //public async Task<JsonNode> CloneProductAsync(string username, string productId)
+        //{
+        //    var token = await _accountTokenRepo.GetByUsername(username);
+        //    if (token == null)
+        //        throw new ArgumentException($"Không tìm thấy token cho user '{username}'");
+
+        //    _logger.LogInformation("Clone product {ProductId} cho {User}", productId, username);
+
+        //    // 1) Lấy detail
+        //    var detail = await _shopee.GetProductDetailAsync(token, productId);
+
+        //    // 2) Map sang payload create (MapDetailToCreatePayload có thể đưa vào đây)
+        //    var payload = MapDetailToCreatePayload(detail);
+
+        //    // 3) Gửi create
+        //    var result = await _shopee.CreateProductAsync(token, payload, productId);
+
+        //    return result;
+        //}
+
         public async Task<JsonNode> CloneProductAsync(string username, string productId)
         {
-            var token = await _accountTokenRepo.GetByUsername(username);
-            if (token == null)
-                throw new ArgumentException($"Không tìm thấy token cho user '{username}'");
+            var tokenAcc1 = await _accountTokenRepo.GetByUsername(username);
+            if (tokenAcc1 == null)
+                throw new ArgumentException($"Không tìm thấy token1");
 
             _logger.LogInformation("Clone product {ProductId} cho {User}", productId, username);
 
             // 1) Lấy detail
-            var detail = await _shopee.GetProductDetailAsync(token, productId);
+            var detail = await _shopee.GetProductDetailAsync(tokenAcc1, productId);
 
             // 2) Map sang payload create (MapDetailToCreatePayload có thể đưa vào đây)
             var payload = MapDetailToCreatePayload(detail);
 
             // 3) Gửi create
-            var result = await _shopee.CreateProductAsync(token, payload, productId);
+            var tokenAcc2 = await _accountTokenRepo.GetByUsername("0938641861");
+            if (tokenAcc2 == null)
+                throw new ArgumentException($"Không tìm thấy tokenAcc2");
+            var result = await _shopee.CreateProductAsync(tokenAcc2, payload, productId);
 
             return result;
         }

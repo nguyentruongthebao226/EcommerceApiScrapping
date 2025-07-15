@@ -24,8 +24,12 @@ namespace EcommerceApiScrapingService.Services
             // Click login button (cần đúng selector, có thể phải update theo giao diện)
             await page.ClickAsync("button.ZzzLTG"); // Có thể thay đổi nếu selector đổi
 
+            await page.WaitForURLAsync("**/verify/ivs**", new() { Timeout = 30000 });
+
+            await page.ClickAsync("button:has-text(\"Xác minh bằng liên kết Email\")");
+
             // Đợi chuyển trang thành công
-            await page.WaitForURLAsync("https://banhang.shopee.vn/**", new() { Timeout = 20000 }); // chỉ chờ chuyển trang
+            await page.WaitForURLAsync("https://banhang.shopee.vn/**", new() { Timeout = 60000 }); // chỉ chờ chuyển trang
                                                                                                    // KHÔNG cần WaitForLoadStateAsync(NetworkIdle) nữa
                                                                                                    // (Nếu vẫn muốn, chỉ dùng WaitForLoadStateAsync(Load) để tránh bị treo)
             await page.WaitForLoadStateAsync(LoadState.Load);
