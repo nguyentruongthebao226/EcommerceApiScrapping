@@ -1,4 +1,5 @@
-﻿using EcommerceApiScrapingService.Services;
+﻿using EcommerceApiScrapingService.DTOs;
+using EcommerceApiScrapingService.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Nodes;
 
@@ -35,11 +36,30 @@ namespace EcommerceApiScrapingService.Controllers
         public async Task<IActionResult> ProductList(
            [FromQuery] string username,
            [FromQuery] int page = 1,
-           [FromQuery] int size = 12)
+           [FromQuery] int size = 12,
+           [FromQuery] bool checkCloned = false)
         {
             try
             {
                 var list = await _prodSvc.GetProductListAsync(username, page, size);
+                return Ok(list);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        [HttpGet("product-list-filter")]
+        public async Task<IActionResult> ProductListFilter(
+          [FromQuery] string username,
+          [FromQuery] int page = 1,
+          [FromQuery] int size = 12,
+          [FromQuery] int category_id = 0)
+        {
+            try
+            {
+                var list = await _prodSvc.GetProductListWithFilterAndCheckClonedAsync(username, page, size, category_id, true);
                 return Ok(list);
             }
             catch (ArgumentException ex)
@@ -65,13 +85,14 @@ namespace EcommerceApiScrapingService.Controllers
         }
 
         [HttpPost("product-create")]
-        public async Task<IActionResult> CreateProduct(
-           [FromQuery] string username,
-           [FromBody] JsonObject payload)
+        public async Task<IActionResult> CloneProductsAsync(
+            [FromQuery] string usernameOriginal,
+            [FromQuery] string usernameDestination,
+            [FromBody] CloneProductsRequest request)
         {
             try
             {
-                var result = await _prodSvc.CreateProductAsync(username, payload);
+                var result = await _prodSvc.CloneProductsAsync(usernameDestination, usernameOriginal, request.ProductIds);
                 return Ok(result);
             }
             catch (ArgumentException ex)
@@ -82,12 +103,29 @@ namespace EcommerceApiScrapingService.Controllers
 
         [HttpPost("product-detail-clone")]
         public async Task<IActionResult> CloneProductByDetail(
-            [FromQuery] string username,
+          [FromQuery] string usernameDestination,
+          [FromBody] JsonObject payload)
+        {
+            try
+            {
+                var resp = await _prodSvc.CloneProductInDetail(usernameDestination, payload);
+                return Ok(resp);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        [HttpPost("product-detail-clone-test")]
+        public async Task<IActionResult> CloneProductByDetail(
+            [FromQuery] string usernameOriginal,
+            [FromQuery] string usernameDestination,
             [FromQuery] string productId)
         {
             try
             {
-                var resp = await _prodSvc.CloneProductAsync(username, productId);
+                var resp = await _prodSvc.CloneProductAsync(usernameDestination, usernameOriginal, productId);
                 return Ok(resp);
             }
             catch (ArgumentException ex)

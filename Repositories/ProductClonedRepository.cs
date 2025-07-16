@@ -9,7 +9,8 @@ namespace EcommerceApiScrapingService.Repositories
     {
         // thêm method đặc thù nếu cần, ví dụ:
         Task CreateProductCloned(AccountToken accountToken, string productId);
-        Task<ProductCloned> GetByUsername(string username);
+        Task<List<ProductCloned>> GetByUsername(string username);
+        Task<ProductCloned> GetByUsernameAndProductId(string username, string productId);
     }
     public class ProductClonedRepository
     : MongoRepository<ProductCloned>, IProductClonedRepository
@@ -19,9 +20,19 @@ namespace EcommerceApiScrapingService.Repositories
         {
         }
 
-        public async Task<ProductCloned> GetByUsername(string username)
+        public async Task<List<ProductCloned>> GetByUsername(string username)
         {
             var filter = Builders<ProductCloned>.Filter.Eq(t => t.Username, username);
+            var existing = await _col.Find(filter).ToListAsync();
+            return existing;
+        }
+
+        public async Task<ProductCloned> GetByUsernameAndProductId(string username, string productId)
+        {
+            var filter = Builders<ProductCloned>.Filter.And(
+                Builders<ProductCloned>.Filter.Eq(t => t.Username, username),
+                Builders<ProductCloned>.Filter.Eq(t => t.ProductId, productId)
+            );
             var existing = await _col.Find(filter).FirstOrDefaultAsync();
             return existing;
         }

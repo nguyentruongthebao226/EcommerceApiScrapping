@@ -11,6 +11,7 @@
             public string GetProductDetail { get; set; } = "";
             public string CreateProduct { get; set; } = "";
             public string ShopInfo { get; set; } = "";
+            public string GetProductListIsActive { get; set; } = "";
         }
     }
 

@@ -11,8 +11,10 @@ namespace EcommerceApiScrapingService.Services
     {
         Task<JsonNode> GetShopInfoAsync(AccountToken token);
         Task<JsonNode> GetProductListAsync(AccountToken token, int page, int size);
+        Task<(JsonNode responseData, List<string> clonedIds)> GetProductListWithFilterAndCheckClonedAsync(AccountToken token, int page, int size, int category_id = 0, bool checkCloned = false);
         Task<JsonNode> GetProductDetailAsync(AccountToken token, string productId);
         Task<JsonNode> CreateProductAsync(AccountToken token, JsonObject payload, string productId);
+        Task<bool> CheckExistingCloned(string username, string productId);
     }
 
     public class ShopeeClient : IShopeeClient
@@ -70,6 +72,7 @@ namespace EcommerceApiScrapingService.Services
         public async Task<JsonNode> GetProductListAsync(AccountToken token, int page, int size)
         {
             // append paging to path or to the query string in NewRequest
+            // Hiện tại endpoints này là lấy full product kể cả hoạt động và không hoạt động
             var req = NewRequest(HttpMethod.Get, _opt.Endpoints.GetProductList, token);
             var uri = new UriBuilder(req.RequestUri!)
             {
@@ -81,6 +84,61 @@ namespace EcommerceApiScrapingService.Services
             using var resp = await _http.SendAsync(req);
             resp.EnsureSuccessStatusCode();
             return JsonNode.Parse(await resp.Content.ReadAsStringAsync())!;
+        }
+
+        public async Task<(JsonNode responseData, List<string> clonedIds)> GetProductListWithFilterAndCheckClonedAsync(AccountToken token, int page, int size, int category_id = 0, bool checkCloned = false)
+        {
+            // Hiện tại để size lớn để get hết tất cả sản phẩm lên để dễ handle và truyền vào API Clone
+            // Hiện tại ở API Clone sẽ thao tác rất nhiều nên để size max ở đây sẽ support timeout API Clone
+            size = 10000000;
+            // append paging to path or to the query string in NewRequest
+            var req = NewRequest(HttpMethod.Get, _opt.Endpoints.GetProductListIsActive, token);
+            if (category_id == 0)
+            {
+                var uri = new UriBuilder(req.RequestUri!)
+                {
+                    Query = req.RequestUri!.Query +
+                       $"&page_number={page}&page_size={size}&list_type=live_all&request_attribute=&operation_sort_by=recommend&need_ads=true"
+                };
+                req.RequestUri = uri.Uri;
+            }
+            else
+            {
+                var uri = new UriBuilder(req.RequestUri!)
+                {
+                    Query = req.RequestUri!.Query +
+                   $"&page_number={page}&page_size={size}&list_type=live_all&category_id={category_id}&request_attribute=&operation_sort_by=recommend&need_ads=true"
+                };
+                req.RequestUri = uri.Uri;
+            }
+
+            using var resp = await _http.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
+
+            var responseData = await resp.Content.ReadAsStringAsync();
+            var json = JsonNode.Parse(responseData)!;
+
+            // Lấy danh sách các productId đã clone
+            var clonedIds = new List<string>();
+            var products = json["data"]?["products"]?.AsArray();
+
+            if (products != null)
+            {
+                foreach (var product in products)
+                {
+                    var productId = product?["id"]?.ToString();
+                    if (!string.IsNullOrEmpty(productId))
+                    {
+                        if (await CheckExistingCloned(token.Username, productId))
+                        {
+                            clonedIds.Add(productId);
+                        }
+                    }
+                }
+            }
+
+            // Trả về tuple (JsonNode, List<string>)
+            return (json, clonedIds);
         }
 
         public async Task<JsonNode> GetProductDetailAsync(AccountToken token, string productId)
@@ -130,6 +188,46 @@ namespace EcommerceApiScrapingService.Services
                 await _productClonedRepository.CreateProductCloned(token, productId);
             }
             return JsonNode.Parse(body)!;
+        }
+
+        public async Task<bool> CheckExistingCloned(string username, string productId)
+        {
+            var existing = await _productClonedRepository.GetByUsernameAndProductId(username, productId);
+            if (existing is not null)
+                return true;
+            return false;
+        }
+
+        public async Task<(JsonNode responseData, List<string> productIdsCloned)> GetProductsAndCheckCloned(
+            string username,
+            string responseData)
+        {
+            var productIdsCloned = new List<string>();
+
+            // Parse responseData thành JsonNode
+            var json = JsonNode.Parse(responseData)!;
+
+            // Lấy products array
+            var products = json["data"]?["products"]?.AsArray();
+            if (products == null)
+                return (json, productIdsCloned); // Không có products
+
+            // Lặp qua từng sản phẩm
+            foreach (var product in products)
+            {
+                var productId = product?["id"]?.ToString();
+                if (!string.IsNullOrEmpty(productId))
+                {
+                    // Gọi check cloned
+                    if (await CheckExistingCloned(username, productId))
+                    {
+                        productIdsCloned.Add(productId);
+                    }
+                }
+            }
+
+            // Trả về tuple gồm responseData (JsonNode) và danh sách các productId đã clone
+            return (json, productIdsCloned);
         }
     }
 }

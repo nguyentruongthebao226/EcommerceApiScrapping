@@ -7,9 +7,11 @@ namespace EcommerceApiScrapingService.Services
     {
         Task<JsonNode> GetShopInfoAsync(string username);
         Task<JsonNode> GetProductListAsync(string username, int pageNumber, int pageSize);
+        Task<(JsonNode responseData, List<string> clonedIds)> GetProductListWithFilterAndCheckClonedAsync(string username, int pageNumber, int pageSize, int category_id = 0, bool checkCloned = false);
         Task<JsonNode> GetProductDetailAsync(string username, string productId);
-        Task<JsonNode> CreateProductAsync(string username, JsonObject payload);
-        Task<JsonNode> CloneProductAsync(string username, string productId);
+        Task<JsonObject> CloneProductAsync(string usernameDestination, string usernameOriginal, string productId);
+        Task<JsonNode> CloneProductInDetail(string username, JsonObject payload);
+        Task<JsonArray> CloneProductsAsync(string usernameDestination, string usernameOriginal, List<string> productIds);
     }
 
     public class ProductService : IProductService
@@ -50,6 +52,17 @@ namespace EcommerceApiScrapingService.Services
             return node;
         }
 
+        public async Task<(JsonNode responseData, List<string> clonedIds)> GetProductListWithFilterAndCheckClonedAsync(string username, int pageNumber, int pageSize, int category_id = 0, bool checkCloned = false)
+        {
+            var token = await _accountTokenRepo.GetByUsername(username);
+            if (token == null)
+                throw new ArgumentException($"Không tìm thấy token cho user '{username}'");
+
+            _logger.LogInformation("Lấy product-list trang {Page}", pageNumber);
+            var (responseData, clonedIds) = await _shopee.GetProductListWithFilterAndCheckClonedAsync(token, pageNumber, pageSize, category_id, checkCloned);
+            return (responseData, clonedIds);
+        }
+
         public async Task<JsonNode> GetProductDetailAsync(string username, string productId)
         {
             var token = await _accountTokenRepo.GetByUsername(username);
@@ -57,60 +70,150 @@ namespace EcommerceApiScrapingService.Services
             return await _shopee.GetProductDetailAsync(token, productId);
         }
 
-        public async Task<JsonNode> CreateProductAsync(string username, JsonObject payload)
+        public async Task<JsonNode> CloneProductInDetail(string username, JsonObject payload)
         {
             var token = await _accountTokenRepo.GetByUsername(username);
             if (token == null) throw new ArgumentException($"Không tìm thấy token cho user '{username}'");
             string productId = "";
             if (payload["id"] is JsonNode id)
                 productId = id.DeepClone().ToString();
-
-            var payloadMapping = MapDetailToCreatePayload(payload);
+            var data = payload["data"]!["product_info"]!;
+            var payloadMapping = MapDetailToCreatePayload(data);
             return await _shopee.CreateProductAsync(token, payloadMapping, productId);
         }
 
-        //public async Task<JsonNode> CloneProductAsync(string username, string productId)
-        //{
-        //    var token = await _accountTokenRepo.GetByUsername(username);
-        //    if (token == null)
-        //        throw new ArgumentException($"Không tìm thấy token cho user '{username}'");
 
-        //    _logger.LogInformation("Clone product {ProductId} cho {User}", productId, username);
-
-        //    // 1) Lấy detail
-        //    var detail = await _shopee.GetProductDetailAsync(token, productId);
-
-        //    // 2) Map sang payload create (MapDetailToCreatePayload có thể đưa vào đây)
-        //    var payload = MapDetailToCreatePayload(detail);
-
-        //    // 3) Gửi create
-        //    var result = await _shopee.CreateProductAsync(token, payload, productId);
-
-        //    return result;
-        //}
-
-        public async Task<JsonNode> CloneProductAsync(string username, string productId)
+        public async Task<JsonObject> CloneProductAsync(string usernameDestination, string usernameOriginal, string productId)
         {
-            var tokenAcc1 = await _accountTokenRepo.GetByUsername(username);
-            if (tokenAcc1 == null)
-                throw new ArgumentException($"Không tìm thấy token1");
+            try
+            {
+                // 1. Check đã clone chưa
+                if (await _shopee.CheckExistingCloned(usernameDestination, productId))
+                {
+                    return new JsonObject
+                    {
+                        ["productId"] = productId,
+                        ["success"] = false,
+                        ["existingProduct"] = true,
+                        ["message"] = "Product already cloned"
+                    };
+                }
 
-            _logger.LogInformation("Clone product {ProductId} cho {User}", productId, username);
+                // 2. Check token
+                var tokenOriginal = await _accountTokenRepo.GetByUsername(usernameOriginal);
+                var tokenDestination = await _accountTokenRepo.GetByUsername(usernameDestination);
+                if (tokenOriginal == null || tokenDestination == null)
+                {
+                    string username = tokenOriginal == null ? usernameOriginal : usernameDestination;
+                    return new JsonObject
+                    {
+                        ["productId"] = productId,
+                        ["success"] = false,
+                        ["error"] = $"Can't find token for user: '{username}'"
+                    };
+                }
 
-            // 1) Lấy detail
-            var detail = await _shopee.GetProductDetailAsync(tokenAcc1, productId);
+                _logger.LogInformation("Clone product {ProductId} cho {User}", productId, usernameDestination);
 
-            // 2) Map sang payload create (MapDetailToCreatePayload có thể đưa vào đây)
-            var payload = MapDetailToCreatePayload(detail);
+                // 3. Lấy detail từ Shopee
+                var detail = await _shopee.GetProductDetailAsync(tokenOriginal, productId);
+                var payload = MapDetailToCreatePayload(detail);
 
-            // 3) Gửi create
-            var tokenAcc2 = await _accountTokenRepo.GetByUsername("0938641861");
-            if (tokenAcc2 == null)
-                throw new ArgumentException($"Không tìm thấy tokenAcc2");
-            var result = await _shopee.CreateProductAsync(tokenAcc2, payload, productId);
+                // 4. Delay random trước khi tạo sản phẩm (giảm burst request)
+                var random = new Random();
+                await Task.Delay(random.Next(100, 500));
 
-            return result;
+                // 5. Gọi API tạo sản phẩm
+                var result = await _shopee.CreateProductAsync(tokenDestination, payload, productId);
+
+                return new JsonObject
+                {
+                    ["productId"] = productId,
+                    ["success"] = true,
+                    ["result"] = result
+                };
+            }
+            catch (Exception ex)
+            {
+                return new JsonObject
+                {
+                    ["productId"] = productId,
+                    ["success"] = false,
+                    ["error"] = ex.Message
+                };
+            }
         }
+
+
+        public async Task<JsonArray> CloneProductsAsync(string usernameDestination, string usernameOriginal, List<string> productIds)
+        {
+            var tokenOriginal = await _accountTokenRepo.GetByUsername(usernameOriginal);
+            var tokenDestination = await _accountTokenRepo.GetByUsername(usernameDestination);
+            if (tokenOriginal == null || tokenDestination == null)
+            {
+                string username = tokenOriginal == null ? usernameOriginal : usernameDestination;
+                throw new ArgumentException($"Can't find token for user: '{username}'");
+            }
+
+            int maxConcurrency = 5; // Số task chạy song song tối đa, bạn có thể điều chỉnh
+            var semaphore = new SemaphoreSlim(maxConcurrency);
+            var random = new Random();
+            var results = new List<Task<JsonObject>>();
+
+            foreach (var productId in productIds)
+            {
+                results.Add(Task.Run(async () =>
+                {
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        if (await _shopee.CheckExistingCloned(usernameDestination, productId))
+                        {
+                            return new JsonObject
+                            {
+                                ["productId"] = productId,
+                                ["success"] = false,
+                                ["existingProduct"] = true,
+                                ["message"] = "Product already cloned"
+                            };
+                        }
+                        var detail = await _shopee.GetProductDetailAsync(tokenOriginal, productId);
+                        var payload = MapDetailToCreatePayload(detail);
+
+                        // Delay trước khi gọi API tạo sản phẩm (tránh burst)
+                        await Task.Delay(random.Next(100, 500));
+                        var result = await _shopee.CreateProductAsync(tokenDestination, payload, productId);
+
+                        return new JsonObject
+                        {
+                            ["productId"] = productId,
+                            ["success"] = true,
+                            ["result"] = result
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        return new JsonObject
+                        {
+                            ["productId"] = productId,
+                            ["success"] = false,
+                            ["error"] = ex.Message
+                        };
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }));
+            }
+
+            var allResults = await Task.WhenAll(results);
+            var array = new JsonArray();
+            foreach (var item in allResults) array.Add(item);
+            return array;
+        }
+
+
 
         private JsonObject MapDetailToCreatePayload(JsonNode detail)
         {
