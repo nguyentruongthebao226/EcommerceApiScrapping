@@ -57,9 +57,24 @@ builder.Services
 
 builder.Services.Configure<ShopeeOAuthSettings>(
     builder.Configuration.GetSection("ShopeeOAuth"));
+
+// Thêm CORS policy
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy
+            .AllowAnyOrigin()    // Cho phép mọi domain gọi (phát triển, không nên dùng khi production)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddControllers();
 
 var app = builder.Build();
+
+app.UseCors(); // Kích hoạt CORS ở đầu pipeline
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

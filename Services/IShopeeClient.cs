@@ -90,7 +90,7 @@ namespace EcommerceApiScrapingService.Services
         {
             // Hiện tại để size lớn để get hết tất cả sản phẩm lên để dễ handle và truyền vào API Clone
             // Hiện tại ở API Clone sẽ thao tác rất nhiều nên để size max ở đây sẽ support timeout API Clone
-            size = 10000000;
+            // size = 12;
             // append paging to path or to the query string in NewRequest
             var req = NewRequest(HttpMethod.Get, _opt.Endpoints.GetProductListIsActive, token);
             if (category_id == 0)
